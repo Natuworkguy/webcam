@@ -125,11 +125,23 @@
     
     #projectName {
       max-width: 90%;
+      text-align: center;
+      height: 30px;
+      line-height: 30px;
+      font-size: 16px;
+    }
+    
+    .filterLabel {
+      color: #00ff99;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      text-align: center;
+
     }
   </style>
 </head>
 <body>
-  <video id="cam" autoplay playsinline></video>
+  <video id="cam" autoplay playsinline muted></video>
 
   <div id="cameraSelectorContainer">
     <label for="projectName" class="ctr projectLabel">Project</label>
@@ -140,7 +152,7 @@
     <label id="cameraSelectorLabel" for="cameraSelector">Camera</label>
     <select id="cameraSelector"></select>
 
-    <label for="filterSelector" class="ctr">Filter</label>
+    <label for="filterSelector" class="ctr filterLabel">Filter</label>
     <select id="filterSelector">
       <option value="none">None</option>
       <option value="grayscale(100%)">Grayscale</option>
@@ -195,7 +207,10 @@
       try {
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         currentStream = stream;
-        video.srcObject = stream;
+
+        const videoOnlyStream = new MediaStream(stream.getVideoTracks());
+        video.srcObject = videoOnlyStream;
+
       } catch (err) {
         console.error("Camera access failed:", err);
         document.body.innerHTML = `<div class="mobile-warning">Couldn’t access the camera.<br>Check permissions or device compatibility.</div>`;
@@ -225,7 +240,7 @@
     });
 
     document.addEventListener('keydown', (e) => {
-      if (e.ctrlKey && e.key.toLowerCase() === 'o') {
+      if (e.ctrlKey && e.key.toLowerCase() === 'y') {
         e.preventDefault();
         container.classList.toggle('open');
         if (container.classList.contains('open')) {
