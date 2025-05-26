@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Camera Feed</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background: black;
+      font-family: 'Segoe UI', sans-serif;
+      color: #00ff99;
+    }
+
+    video {
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      display: block;
+      box-shadow: 0 0 30px #00ff99;
+      filter: none;
+      transition: filter 0.3s ease-in-out;
+    }
+
+    #cameraSelectorContainer {
+      position: fixed;
+      top: 0;
+      left: -500px;
+      width: 280px;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.92);
+      border-right: 3px solid #00ff99;
+      padding: 1rem;
+      z-index: 999;
+      transition: transform 0.4s ease-in-out;
+      transform: translateX(0);
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    #cameraSelectorContainer.open {
+      transform: translateX(500px);
+      box-shadow: 5px 0 20px #00ff99;
+    }
+
+    #cameraSelector, #filterSelector, input[type="text"] {
+      width: 100%;
+      padding: 0.5rem;
+      background: #000;
+      color: #00ff99;
+      border: 2px solid #00ff99;
+      border-radius: 5px;
+      font-size: 1rem;
+    }
+
+    #optionsMenuLabel,
+    #cameraSelectorLabel {
+      color: #00ff99;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      text-align: center;
+    }
+
+    .mobile-warning {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.9);
+      border: 2px solid #ff4444;
+      border-radius: 10px;
+      padding: 2rem;
+      color: #ff4444;
+      text-align: center;
+      font-size: 1.2rem;
+      box-shadow: 0 0 20px #ff4444;
+      z-index: 1000;
+    }
+
+    .record-controls button {
+      padding: 0.6rem;
+      border: 2px solid #00ff99;
+      background: black;
+      color: #00ff99;
+      font-weight: bold;
+      font-size: 1rem;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .record-controls button:hover {
+      background: #00ff99;
+      color: black;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .record-controls {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+    
+    .ctr {
+      text-align: center;
+      align-content: center;
+      align-items: center;
+      align-self: center;
+    }
+    
+    .projectLabel {
+      color: #00ff99;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      text-align: center;
+    }
+    
+    #projectName {
+      max-width: 90%;
+    }
+  </style>
+</head>
+<body>
+  <video id="cam" autoplay playsinline></video>
+
+  <div id="cameraSelectorContainer">
+    <label for="projectName" class="ctr projectLabel">Project</label>
+    <input type="text" id="projectName" placeholder="Project name" value="my-recording" />
+
+    <label id="optionsMenuLabel">Options</label>
+    <hr style="width: 100%; border: 2px solid #00ff99;" />
+    <label id="cameraSelectorLabel" for="cameraSelector">Camera</label>
+    <select id="cameraSelector"></select>
+
+    <label for="filterSelector" class="ctr">Filter</label>
+    <select id="filterSelector">
+      <option value="none">None</option>
+      <option value="grayscale(100%)">Grayscale</option>
+      <option value="sepia(100%)">Sepia</option>
+      <option value="invert(100%)">Invert</option>
+      <option value="contrast(200%) brightness(120%)">High Contrast</option>
+      <option value="blur(4px)">Blur</option>
+    </select>
+
+    <div class="record-controls">
+      <button id="recordBtn">Record</button>
+      <button id="pauseBtn" class="hidden">Pause</button>
+      <button id="saveBtn" class="hidden">Save</button>
+    </div>
+  </div>
+
+  <div id="mobileWarning" class="mobile-warning" style="display: none;">
+    This site requires a desktop.<br>
+  </div>
+
+  <script>
+    const video = document.getElementById('cam');
+    const cameraSelector = document.getElementById('cameraSelector');
+    const container = document.getElementById('cameraSelectorContainer');
+    const mobileWarning = document.getElementById('mobileWarning');
+    const filterSelector = document.getElementById('filterSelector');
+    const recordBtn = document.getElementById('recordBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const projectNameInput = document.getElementById('projectName');
+
+    let currentStream;
+    let mediaRecorder;
+    let recordedChunks = [];
+    let isRecording = false;
+    let isPaused = false;
+
+    function isMobileDevice() {
+      return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+    }
+
+    async function startCamera(deviceId = null) {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+
+      const constraints = {
+        video: deviceId ? { deviceId: { exact: deviceId } } : true,
+        audio: true
+      };
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        currentStream = stream;
+        video.srcObject = stream;
+      } catch (err) {
+        console.error("Camera access failed:", err);
+        document.body.innerHTML = `<div class="mobile-warning">Couldn’t access the camera.<br>Check permissions or device compatibility.</div>`;
+      }
+    }
+
+    async function populateCameraOptions() {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+      cameraSelector.innerHTML = '';
+      videoDevices.forEach(device => {
+        const option = document.createElement('option');
+        option.value = device.deviceId;
+        option.text = device.label || `Camera ${cameraSelector.length + 1}`;
+        cameraSelector.appendChild(option);
+      });
+    }
+
+    cameraSelector.addEventListener('change', () => {
+      const selectedDeviceId = cameraSelector.value;
+      startCamera(selectedDeviceId);
+    });
+
+    filterSelector.addEventListener('change', () => {
+      video.style.filter = filterSelector.value;
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key.toLowerCase() === 'o') {
+        e.preventDefault();
+        container.classList.toggle('open');
+        if (container.classList.contains('open')) {
+          populateCameraOptions();
+        }
+      }
+    });
+
+    recordBtn.addEventListener("click", () => {
+      if (!isRecording) {
+        const canvasStream = video.captureStream();
+        const audioTracks = currentStream.getAudioTracks();
+        if (audioTracks.length > 0) {
+          canvasStream.addTrack(audioTracks[0]);
+        }
+
+        mediaRecorder = new MediaRecorder(canvasStream, { mimeType: "video/webm" });
+        recordedChunks = [];
+
+        mediaRecorder.ondataavailable = e => {
+          if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          saveBtn.classList.remove("hidden");
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+        recordBtn.textContent = "Stop";
+        pauseBtn.classList.remove("hidden");
+      } else {
+        mediaRecorder.stop();
+        isRecording = false;
+        recordBtn.textContent = "Record";
+        pauseBtn.classList.add("hidden");
+        isPaused = false;
+        pauseBtn.textContent = "Pause";
+      }
+    });
+
+    pauseBtn.addEventListener("click", () => {
+      if (mediaRecorder && isRecording) {
+        if (!isPaused) {
+          mediaRecorder.pause();
+          isPaused = true;
+          pauseBtn.textContent = "Resume";
+        } else {
+          mediaRecorder.resume();
+          isPaused = false;
+          pauseBtn.textContent = "Pause";
+        }
+      }
+    });
+
+    saveBtn.addEventListener("click", () => {
+      const blob = new Blob(recordedChunks, { type: "video/webm" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const filename = (projectNameInput.value || "my-recording").trim();
+      a.href = url;
+      a.download = `${filename}.webm`;
+      a.click();
+      URL.revokeObjectURL(url);
+      recordedChunks = [];
+      saveBtn.classList.add("hidden");
+    });
+
+    if (isMobileDevice()) {
+      mobileWarning.style.display = 'block';
+    } else {
+      startCamera();
+    }
+  </script>
+</body>
+</html>
