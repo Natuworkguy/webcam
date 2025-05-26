@@ -31,7 +31,7 @@ This web app grabs your camera feed and streams it full-screen with a slick glow
 * **Video filters:** None, Grayscale, Sepia, Invert, High Contrast, Blur — change on the fly!
 * **Recording controls:** Record, Pause/Resume, Stop, and Save video locally
 * **Project naming:** Name your recording files dynamically
-* **Keyboard shortcut:** `Ctrl + O` toggles the options menu
+* **Keyboard shortcut:** `Ctrl + Y` toggles the options menu
 * **Mobile warning:** Blocks unsupported mobile devices with a polite message
 * **Clean, responsive, and minimalistic UI** styled with a futuristic green glow
 
